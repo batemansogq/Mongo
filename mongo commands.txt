@@ -1,0 +1,86 @@
+cd C:\Program Files\MongoDB\Server\3.4\bin
+
+https://docs.mongodb.com/manual/reference/mongo-shell/
+https://docs.mongodb.com/manual/reference/operator/
+
+show dbs
+
+#find
+db.users.find().pretty()
+#filter
+db.find({"title": "Jaws"}).pretty()
+#filter on a single in a array
+db.movieDetails.find({"tomato.meter" : 100}).pretty()
+#exact array match
+db.movieDetails.find({"writers" : ["Ethan Coen", "Joel Coen"]}).count()
+#postion in array
+db.movieDetails.find({"actors.0" : "Jeff Bridges"}).count()
+
+#projections, only show title, exclude _id
+db.movieDetails.find({rated : "PG"}, {title:1, _id:0}).pretty()
+
+#quering
+# greater than
+db.movieDetails.find({ runtime: { $gt: 90 } }).count()
+#between
+db.movieDetails.find({ runtime: { $gt: 90, $lt: 120 } }).count()
+#mutliple fields
+db.movieDetails.find({ "tomato.meter": { $gte: 95 }, runtime: { $gt: 180 } })
+#not equal
+db.movieDetails.find({ rated: { $ne: "UNRATED" } }).count()
+#in list
+db.movieDetails.find({ rated: { $in: ["G", "PG"] } }).pretty()
+
+#logical tests
+# does a field exist?
+db.moviesDetails.find({ "tomato.meter": { $exists: true } })
+# whats the data type?
+db.moviesScratch.find({ _id: { $type: "string" } })
+
+#regex
+db.movieDetails.find({ "awards.text": { $regex: /^Won.*/ } },
+                     { title: 1, "awards": 1, _id: 0}).pretty()
+
+#sort a return
+db.movieDetails.find().sort({student_id:1, score:-1})
+					 
+#change dbs
+use video;
+# insert that db
+db.movies.insertOne({ "title": "Jaws", "year": 1975, "imdb": "tt0073195" });
+
+#insert many, skip existing
+db.l2.insertMany(
+    [
+        {
+	    "_id" : "tt0084726",
+	    "title" : "Star Trek II: The Wrath of Khan",
+	    "year" : 1982,
+	    "type" : "movie"
+        },
+        {
+	    "_id" : "tt0117731",
+	    "title" : "Star Trek: First Contact",
+	    "year" : 1996,
+	    "type" : "movie"
+        }
+    ],
+    {
+        "ordered": false 
+    }
+);
+
+#insert fields in doc
+db.movieDetails.updateOne({title: "The Martian"},
+                          { $inc: { "tomato.reviews": 3, "tomato.userReviews": 25 } })
+
+#updating in array, put at the start to preserve last 5
+db.movieDetails.updateOne({ title: "The Martian" },
+                          {$push: { reviews:
+                                    { $each: [
+                                        { rating: 0.5,
+                                          date: ISODate("2016-01-13T07:00:00Z"),
+                                          reviewer: "Shannon B.",
+                                          text: "Enjoyed watching with my kids!" } ],
+                                      $position: 0,
+                                      $slice: 5 } } } )
