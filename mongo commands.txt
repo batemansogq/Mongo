@@ -1,9 +1,13 @@
 cd C:\Program Files\MongoDB\Server\3.4\bin
 
+mongoimport --drop -d students -c grades E://mongodb/homework/hw2/grades.json
+
 https://docs.mongodb.com/manual/reference/mongo-shell/
 https://docs.mongodb.com/manual/reference/operator/
 
 show dbs
+
+db.copyDatabase("students", "back_students")
 
 #find
 db.users.find().pretty()
@@ -16,8 +20,20 @@ db.movieDetails.find({"writers" : ["Ethan Coen", "Joel Coen"]}).count()
 #postion in array
 db.movieDetails.find({"actors.0" : "Jeff Bridges"}).count()
 
+# find the 101 highest value
+db.grades.find().sort( { 'score' : -1 } ).skip( 100 ).limit( 1 )
+
+# list out the 1st 5 students values in a 2 column list
+db.grades.find( { }, { 'student_id' : 1, 'type' : 1, 'score' : 1, '_id' : 0 } ).sort( { 'student_id' : 1, 'score' : 1 } ).limit( 5 )
+
+#find the student with the highest average
+db.grades.aggregate( { '$group' : { '_id' : '$student_id', 'average' : { $avg : '$score' } } }, { '$sort' : { 'average' : -1 } }, { '$limit' : 1 } )
+
 #projections, only show title, exclude _id
 db.movieDetails.find({rated : "PG"}, {title:1, _id:0}).pretty()
+
+#aggregation
+db.grades.aggregate({'$group':{'_id':'$student_id', 'average':{$avg:'$score'}}}, {'$sort':{'average':-1}}, {'$limit':1})
 
 #quering
 # greater than
