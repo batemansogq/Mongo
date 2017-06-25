@@ -24,6 +24,8 @@ db.movieDetails.find({"writers" : ["Ethan Coen", "Joel Coen"]}).count()
 #postion in array
 db.movieDetails.find({"actors.0" : "Jeff Bridges"}).count()
 
+db.posts.insertOne({ "title": "Jaws", "body":"x", "post_date":"x","permalink":"x", "tags":"x", "author":"x", "comments":"x"}):
+
 # find the 101 highest value
 db.grades.find().sort( { 'score' : -1 } ).skip( 100 ).limit( 1 )
 
@@ -64,8 +66,23 @@ db.moviesScratch.find({ _id: { $type: "string" } })
 db.movieDetails.find({ "awards.text": { $regex: /^Won.*/ } },
                      { title: 1, "awards": 1, _id: 0}).pretty()
 
+#make a unique index
+db.students.createIndex({"student_id":1,"class_id":1 }, {"unique":true})
+					 
 #sort a return
 db.movieDetails.find().sort({student_id:1, score:-1})
+
+#2d geo search
+db.places.find( { location : { $near : [74,140] } }).limit(3)
+
+#3d geo search
+db.stores.find({ loc:{ $near: { $geometry: { type: "Point", coordinates: [-130, 39]}, $maxDistance:1000000 } } })
+
+#full string text search, words treated as OR
+ db.movies.find( { $text : { $search : "Big Lebowski" } } )
+ 
+ #profiling, the system log for everything over 1 sec, sorted desc
+ db.system.profile.find( { millis : { $gt:1000 } } ).sort( { ts : -1 } )
 					 
 #change dbs
 use video;
