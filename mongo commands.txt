@@ -79,10 +79,159 @@ db.places.find( { location : { $near : [74,140] } }).limit(3)
 db.stores.find({ loc:{ $near: { $geometry: { type: "Point", coordinates: [-130, 39]}, $maxDistance:1000000 } } })
 
 #full string text search, words treated as OR
+db.movies.ensureIndex({'title':'text'})
  db.movies.find( { $text : { $search : "Big Lebowski" } } )
+ 
+	# field ns has the text. 
+	db.sysprofile.ensureIndex({'ns':'text'})
+	db.sysprofile.find({$text:{$search: "school2"}},{"_id":-1, "millis":1}).sort({"millis":-1}).pretty()
  
  #profiling, the system log for everything over 1 sec, sorted desc
  db.system.profile.find( { millis : { $gt:1000 } } ).sort( { ts : -1 } )
+ 
+ #agg query
+ db.products.aggregate([{$group:{"_id":"$category", "num_products":{"$sum":1}}}])
+ 
+ #grouped agg
+ db.stuff.aggregate([{$group:
+             {_id:
+              {'moe':'$a',
+               'larry':'$b',
+               'curly':'$c'
+              }
+             }
+            }])
+			
+# sum pop by state
+db.zips.aggregate([{"$group":{"_id":"$state", "population":{$sum:"$pop"}}}])	
+#avg pop by state
+db.zips.aggregate([{"$group":{"_id":"$state","average_pop":{"$avg":"$pop"} }}])	
+#create an array of unique values
+db.zips.aggregate([{"$group":{"_id":"$city", "postal_codes":{"$addToSet":"$_id"}}}])
+#create an array of values
+db.zips.aggregate([{"$group":{"_id":"$city", "postal_codes":{"$push":"$_id"}}}])
+#max by state
+db.zips.aggregate([{"$group":{"_id":"$state", pop:{"$max":"$pop"}}}])
+# grouping into a grouping
+db.fun.aggregate([{$group:{_id:{a:"$a", b:"$b"}, c:{$max:"$c"}}}, {$group:{_id:"$_id.a", c:{$min:"$c"}}}])
+
+#project
+db.zips.aggregate([{$project:{_id:0, city:{$toLower:"$city"}, pop:1, state:1, zip:"$_id"}}])
+#complex project
+db.products.aggregate([{$project:
+     {	 _id:0,
+	 'maker': {$toLower:"$manufacturer"},
+	 'details': {'category': "$category",
+		     'price' : {"$multiply":["$price",10]}
+		    },
+	 'item':'$name'
+     }    }])
+	 
+# filter, sum & reshape
+db.zips.aggregate([
+    {$match:     {	 state:"NY"     }    },
+    {$group:     {	 _id: "$city",	 population: {$sum:"$pop"},	 zip_codes: {$addToSet: "$_id"}     }    },
+    {$project:    {	 _id: 0,	 city: "$_id",	 population: 1,	 zip_codes:1     }    }   
+])
+
+#filter on value
+db.zips.aggregate([{$match:{pop:{$gt:100000}}}])
+
+#filter on many 
+db.zips.aggregate([{"$match":{"$or":[{state:"CT", pop:{"$gt":25000}},{state:"NJ", pop:{"$gt":25000}}]}}
+	,{"$group":{"_id":null, "avg":{"$avg":"$pop"}}} ])
+
+#text search & order returns, just words
+db.sentences.aggregate([{$match : {$text: {$search: "tree rat"}}},
+{$sort:{score:{$meta: "textScore"}}},
+{$project:{words:1, _id:0}}])
+
+#filter, sum pop, reshape & sort desc
+db.zips.aggregate([
+    {$match:     {	 state:"NY"     }    },
+    {$group:     {	 _id: "$city",	 population: {$sum:"$pop"},     }    },
+    {$project:     {	 _id: 0,	 city: "$_id",	 population: 1,     }    },
+    {$sort:     {	 population:-1     }    }
+      ])
+					 
+#multiple sorts
+db.zips.aggregate([{$sort:{state:1, city:1}}])		
+
+#skip and limit
+db.zips.aggregate([
+    {$match:     {	 state:"NY"     }    },
+    {$group:     {	 _id: "$city",	 population: {$sum:"$pop"},     }    },
+    {$project:     {	 _id: 0,	 city: "$_id",	 population: 1,     }    },
+    {$sort:     {	 population:-1     }    },
+    {$skip: 10},
+    {$limit: 5}])
+			 
+# find the largest pop in each state, sort result
+db.zips.aggregate([
+	 /* get the population of every city in every state */
+		{$group:     {	 _id: {state:"$state", city:"$city"},	 population: {$sum:"$pop"},     }    },
+	 /* sort by state, population */
+		{$sort:      {"_id.state":1, "population":-1}    },
+	 /* group by state, get the first item in each group */
+		{$group:      {	 _id:"$_id.state",	 city: {$first: "$_id.city"},	 population: {$first:"$population"}     }    },
+	 /* now sort by state again */
+		{$sort:     {"_id":1}    }])
+		
+#unwind exmaple
+db.items.insert({_id:'rock', 'attributes':['heavy', 'rough', 'roundish']});
+db.items.aggregate([{$unwind:"$attributes"}]);
+#- 3 rows returned
+
+#find the highest poster
+db.posts.aggregate([{"$unwind":"$comments"}, 
+	{"$group":{"_id":"$comments.author", "count":{"$sum":1}}},
+	{"$sort":{"count":-1} }])
+	
+#substring match and sum the population
+db.zips.aggregate([{$project:{pop:1, first_char:{$substr:["$city",0,1]}}},
+	{$match:{first_char:{$in:["B", "D","O","G","N","M"]}}},
+	{$group:{_id:null, tot:{"$sum":"$pop"}}}])
+
+# find the top 10 tags and display the list
+db.posts.aggregate([
+    /* unwind by tags */
+		{"$unwind":"$tags"},
+    /* now group by tags, counting each tag */
+		{"$group":      {"_id":"$tags",      "count":{$sum:1}     }    },
+    /* sort by popularity */
+		{"$sort":{"count":-1}},
+	/* show me the top 10 */
+		{"$limit": 10},
+    /* change the name of _id to be tag */
+		{"$project":     {_id:0,      'tag':'$_id',      'count' : 1     }    }    ])
+		
+#double unwind
+db.inventory.insert({'name':"T-Shirt", 'sizes':["Small", "Medium", "Large", "X-Large"], 'colors':['navy', "black",  'orange', 'red']})
+db.inventory.insert({'name':"Chino Pants", 'sizes':["32x32", "31x30", "36x32"], 'colors':['navy', 'white', 'orange', 'violet']})
+db.inventory.aggregate([
+    {$unwind: "$sizes"},
+    {$unwind: "$colors"},
+    {$group:     {	'_id': {'size':'$sizes', 'color':'$colors'},	'count' : {'$sum':1}     }    }])
+	
+# reversing
+db.inventory.aggregate([
+    {$unwind: "$sizes"},
+    {$unwind: "$colors"},
+    {$group:      {	'_id': "$name",	 'sizes': {$addToSet: "$sizes"},	 'colors': {$addToSet: "$colors"},     }    }])
+	
+# unwind the array scores, find the stedent avg, then the class avg and sort
+db.grades.aggregate([{"$unwind":"$scores"},
+	{"$match":{"scores.type":{"$ne":"quiz"}}},
+	{"$group":{_id:{stud:"$student_id", class:"$class_id"},avg:{"$avg":"$scores.score"}}},
+	{"$group":{_id:"$_id.class", class_avg:{"$avg":"$avg"}}},
+	{"$sort":{class_avg:-1}}])
+
+# making a collection 
+db.games.aggregate([{$group{_id:{first_name:"$first_name", last_name:"$last_name"}, points:{$sum:"$points}}}, 
+{$out:summary_results}])
+
+#explain
+db.games.aggregate([{$group{_id:{first_name:"$first_name", last_name:"$last_name"}, points:{$sum:"$points}}}], {explain:true})
 					 
 #change dbs
 use video;
