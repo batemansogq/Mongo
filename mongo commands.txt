@@ -2,6 +2,7 @@ cd C:\Program Files\MongoDB\Server\3.4\bin
 
 mongoimport --drop -d students -c grades E://mongodb/homework/hw2/grades.json
 
+E:\mongodb\final\7\final7\
 https://docs.mongodb.com/manual/reference/mongo-shell/
 https://docs.mongodb.com/manual/reference/operator/
 
@@ -43,6 +44,11 @@ db.movieDetails.find({rated : "PG"}, {title:1, _id:0}).pretty()
 
 #aggregation
 db.grades.aggregate({'$group':{'_id':'$student_id', 'average':{$avg:'$score'}}}, {'$sort':{'average':-1}}, {'$limit':1})
+
+#join 2 collections together, count the null values
+> db.kittens.aggregate([{$lookup:{from :"album_images",localField:"_id", foreignField:"_id", as : "Join"}}, 
+{$match:{Join:{$eq:[]}}}, 
+{$group:{_id:null, cnt:{"$sum":1}}}])
 
 #quering
 # greater than
@@ -273,3 +279,6 @@ db.movieDetails.updateOne({ title: "The Martian" },
                                           text: "Enjoyed watching with my kids!" } ],
                                       $position: 0,
                                       $slice: 5 } } } )
+									  
+# find a doc, add a value to a nested array
+db.messages.update({"headers.Message-ID":"<8147308.1075851042335.JavaMail.evans@thyme>"},{$push:{"headers.To":"mrpotatohead@mongodb.com"}})
